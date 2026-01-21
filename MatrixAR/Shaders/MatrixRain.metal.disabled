@@ -1,0 +1,224 @@
+// MatrixRain.metal
+// Surface shader for the Matrix digital rain effect
+
+#include <metal_stdlib>
+#include <RealityKit/RealityKit.h>
+using namespace metal;
+
+// MARK: - Constants
+
+constant float PI = 3.14159265359;
+constant float TAU = 6.28318530718;
+
+// Atlas configuration (must match TextureManager)
+constant int GLYPHS_PER_ROW = 16;
+constant int GLYPHS_PER_COL = 16;
+constant float GLYPH_UV_SIZE = 1.0 / 16.0;
+
+// MARK: - Utility Functions
+
+/// Pseudo-random hash function
+float hash(float2 p) {
+    float3 p3 = fract(float3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+/// Hash function for integer coordinates
+float hash21(float2 p) {
+    p = fract(p * float2(234.34, 435.345));
+    p += dot(p, p + 34.23);
+    return fract(p.x * p.y);
+}
+
+/// Smooth noise function
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+
+    // Smoothstep for interpolation
+    float2 u = f * f * (3.0 - 2.0 * f);
+
+    // Sample corners
+    float a = hash(i);
+    float b = hash(i + float2(1.0, 0.0));
+    float c = hash(i + float2(0.0, 1.0));
+    float d = hash(i + float2(1.0, 1.0));
+
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+/// Triplanar projection for UV coordinates
+/// Maps 3D world position to 2D UV based on surface normal
+float2 triplanarUV(float3 worldPos, float3 normal, float scale, int surfaceType) {
+    float3 absNormal = abs(normal);
+    float2 uv;
+
+    // For walls (vertical surfaces), use projection based on dominant horizontal axis
+    // For floor/ceiling (horizontal), use XZ projection
+    if (surfaceType == 0) {
+        // Wall - project based on dominant axis
+        if (absNormal.x > absNormal.z) {
+            uv = worldPos.zy;
+        } else {
+            uv = worldPos.xy;
+        }
+    } else if (surfaceType == 1) {
+        // Floor - use XZ plane, Y pointing down (rain falls down onto floor)
+        uv = worldPos.xz;
+    } else {
+        // Ceiling - use XZ plane
+        uv = worldPos.xz;
+    }
+
+    return uv * scale;
+}
+
+/// Samples a glyph from the atlas at given cell coordinates
+float sampleGlyph(texture2d<float> atlas, sampler s, float2 cellUV, int glyphIndex) {
+    // Calculate atlas position
+    int row = glyphIndex / GLYPHS_PER_ROW;
+    int col = glyphIndex % GLYPHS_PER_ROW;
+
+    float2 atlasOffset = float2(float(col), float(GLYPHS_PER_COL - 1 - row)) * GLYPH_UV_SIZE;
+    float2 atlasUV = atlasOffset + cellUV * GLYPH_UV_SIZE;
+
+    return atlas.sample(s, atlasUV).r;
+}
+
+// MARK: - Main Surface Shader
+
+[[visible]]
+void matrixRainSurface(realitykit::surface_parameters params)
+{
+    // Get custom uniforms from material
+    // Parameters are packed into the custom value array
+    float time = params.uniforms().custom_parameter()[0];
+    float density = params.uniforms().custom_parameter()[1];
+    float speed = params.uniforms().custom_parameter()[2];
+    float glowIntensity = params.uniforms().custom_parameter()[3];
+
+    float3 baseColor = float3(
+        params.uniforms().custom_parameter()[4],
+        params.uniforms().custom_parameter()[5],
+        params.uniforms().custom_parameter()[6]
+    );
+
+    float3 highlightColor = float3(
+        params.uniforms().custom_parameter()[7],
+        params.uniforms().custom_parameter()[8],
+        params.uniforms().custom_parameter()[9]
+    );
+
+    float charScale = params.uniforms().custom_parameter()[10];
+    float trailLength = params.uniforms().custom_parameter()[11];
+    float randomSeed = params.uniforms().custom_parameter()[12];
+    int surfaceType = int(params.uniforms().custom_parameter()[13]);
+
+    // Get geometry data
+    float3 worldPos = params.geometry().world_position();
+    float3 worldNormal = normalize(params.geometry().world_normal());
+
+    // Calculate triplanar UV
+    float2 uv = triplanarUV(worldPos, worldNormal, density * charScale, surfaceType);
+
+    // Grid cell coordinates
+    float2 cellPos = floor(uv);
+    float2 cellUV = fract(uv);
+
+    // Per-column randomization for variation
+    float columnRandom = hash(float2(cellPos.x, randomSeed * 0.01));
+    float columnOffset = hash(float2(cellPos.x + 100.0, randomSeed * 0.01)) * 100.0;
+
+    // Calculate fall offset with variation per column
+    // Each column has different speed and starting position
+    float fallSpeed = speed * (0.5 + columnRandom * 1.0);
+    float fallOffset = time * fallSpeed + columnOffset;
+
+    // Adjust vertical coordinate with fall
+    float adjustedY = cellPos.y + fallOffset;
+    float2 adjustedCell = float2(cellPos.x, floor(adjustedY));
+
+    // Determine if this cell should show a character (sparse effect)
+    float columnActive = step(0.3, hash(float2(cellPos.x * 0.1, randomSeed)));
+
+    // Glyph selection (changes over time for flickering effect)
+    float glyphChangeRate = 3.0 + hash(adjustedCell) * 5.0;
+    float glyphTime = floor(time * glyphChangeRate);
+    float glyphSeed = hash(adjustedCell + glyphTime * 0.1);
+    int glyphIndex = int(glyphSeed * float(GLYPHS_PER_ROW * GLYPHS_PER_COL));
+
+    // Sample glyph texture
+    constexpr sampler glyphSampler(filter::linear, mip_filter::linear, address::clamp_to_edge);
+    texture2d<float> glyphAtlas = params.textures().custom();
+
+    // Add slight padding to prevent bleeding
+    float2 paddedCellUV = cellUV * 0.9 + 0.05;
+    float glyphAlpha = sampleGlyph(glyphAtlas, glyphSampler, paddedCellUV, glyphIndex);
+
+    // Calculate brightness based on position in trail
+    // Leading edge is brightest, trailing edge fades out
+    float trailPos = fract(adjustedY);
+    float normalizedTrailPos = trailPos / trailLength;
+    float brightness = 1.0 - saturate(normalizedTrailPos);
+    brightness = pow(brightness, 1.2); // Non-linear falloff for more dramatic effect
+
+    // Random brightness variation per cell
+    float cellBrightness = 0.5 + hash(adjustedCell * 0.5) * 0.5;
+    brightness *= cellBrightness;
+
+    // Leading edge highlight (first few characters are much brighter)
+    float leadingEdgeFactor = smoothstep(0.0, 0.15, trailPos);
+    float isLeadingEdge = 1.0 - leadingEdgeFactor;
+
+    // Color interpolation between base and highlight
+    float3 color = mix(baseColor, highlightColor, isLeadingEdge * 0.8);
+
+    // Random flickering effect
+    float flicker = 0.8 + 0.2 * sin(time * 20.0 + hash(adjustedCell) * TAU);
+
+    // Combine all factors
+    float finalAlpha = glyphAlpha * brightness * columnActive * flicker;
+
+    // Apply minimum threshold to avoid very faint characters
+    finalAlpha = finalAlpha > 0.05 ? finalAlpha : 0.0;
+
+    // Apply glow intensity for emissive effect
+    float3 emissiveColor = color * finalAlpha * (1.0 + glowIntensity * 2.0);
+
+    // Add subtle bloom halo around bright characters
+    float haloStrength = glowIntensity * 0.3;
+    float halo = smoothstep(0.5, 0.0, length(cellUV - 0.5)) * finalAlpha * haloStrength;
+    emissiveColor += baseColor * halo;
+
+    // Set surface outputs
+    // Using emissive for self-illumination (no external lighting needed)
+    params.surface().set_emissive_color(half3(emissiveColor));
+
+    // Minimal base color for ambient contribution
+    params.surface().set_base_color(half3(color * 0.05));
+
+    // Set opacity for blending
+    float opacity = saturate(finalAlpha + halo * 0.5);
+    params.surface().set_opacity(half(opacity));
+
+    // No metallic/roughness - pure emissive effect
+    params.surface().set_metallic(half(0.0));
+    params.surface().set_roughness(half(1.0));
+}
+
+// MARK: - Alternative Geometry Modifier (for vertex animation if needed)
+
+[[visible]]
+void matrixGeometryModifier(realitykit::geometry_parameters params)
+{
+    // This modifier can be used for vertex-level effects
+    // Currently passes through unchanged
+    // Could add subtle vertex displacement for "digital glitch" effect
+
+    float3 worldPos = params.geometry().world_position();
+
+    // Optional: Add slight vertex noise for organic feel
+    // float noise = sin(worldPos.x * 10.0 + params.uniforms().time() * 2.0) * 0.001;
+    // params.geometry().set_model_position_offset(float3(0, noise, 0));
+}
