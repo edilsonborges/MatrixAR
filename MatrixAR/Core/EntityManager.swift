@@ -55,9 +55,9 @@ final class EntityManager {
     private func setupDisplayLink() {
         displayLink = CADisplayLink(target: self, selector: #selector(displayLinkUpdate))
         displayLink?.preferredFrameRateRange = CAFrameRateRange(
-            minimum: 30,
-            maximum: 120,
-            preferred: 60
+            minimum: 24,
+            maximum: 60,
+            preferred: 30
         )
         displayLink?.add(to: .main, forMode: .common)
     }
@@ -87,6 +87,11 @@ final class EntityManager {
 
         // Update materials with new time values
         materialFactory.updateTime(effectParameters.time)
+
+        // Update materials on all entities for animation (Matrix falling effect)
+        if materialFactory.isUsingCustomMaterials {
+            meshProcessor.updateMaterialsForAnimation()
+        }
     }
 
     private func handleMemoryWarning() {

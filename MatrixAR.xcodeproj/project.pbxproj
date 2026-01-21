@@ -22,6 +22,8 @@
 		A10000000000000000000013 /* PerformanceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* PerformanceMonitor.swift */; };
 		A10000000000000000000014 /* simd+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* simd+Extensions.swift */; };
 		A10000000000000000000015 /* MeshAnchor+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* MeshAnchor+Extensions.swift */; };
+		A10000000000000000000016 /* MatrixRain.metal in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* MatrixRain.metal */; };
+		A10000000000000000000020 /* MatrixAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* MatrixAnimator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +42,8 @@
 		A20000000000000000000013 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
 		A20000000000000000000014 /* simd+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "simd+Extensions.swift"; sourceTree = "<group>"; };
 		A20000000000000000000015 /* MeshAnchor+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshAnchor+Extensions.swift"; sourceTree = "<group>"; };
+		A20000000000000000000016 /* MatrixRain.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MatrixRain.metal; sourceTree = "<group>"; };
+		A20000000000000000000020 /* MatrixAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatrixAnimator.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* ShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShaderTypes.h; sourceTree = "<group>"; };
 		A20000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000019 /* MatrixAR-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MatrixAR-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -106,6 +110,7 @@
 				A20000000000000000000009 /* EffectParameters.swift */,
 				A20000000000000000000010 /* TextureManager.swift */,
 				A20000000000000000000011 /* MaterialFactory.swift */,
+				A20000000000000000000020 /* MatrixAnimator.swift */,
 			);
 			path = Rendering;
 			sourceTree = "<group>";
@@ -113,6 +118,7 @@
 		A50000000000000000000006 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
+				A20000000000000000000016 /* MatrixRain.metal */,
 				A20000000000000000000017 /* ShaderTypes.h */,
 			);
 			path = Shaders;
@@ -237,6 +243,7 @@
 				A10000000000000000000013 /* PerformanceMonitor.swift in Sources */,
 				A10000000000000000000014 /* simd+Extensions.swift in Sources */,
 				A10000000000000000000015 /* MeshAnchor+Extensions.swift in Sources */,
+				A10000000000000000000020 /* MatrixAnimator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

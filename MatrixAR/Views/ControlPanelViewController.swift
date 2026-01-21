@@ -302,27 +302,27 @@ final class ControlPanelViewController: UIViewController {
 
     @objc private func densityChanged(_ slider: UISlider) {
         effectParameters.characterDensity = slider.value
-        densityValueLabel.text = String(format: "%.2f", slider.value)
+        densityValueLabel?.text = String(format: "%.2f", slider.value)
     }
 
     @objc private func speedChanged(_ slider: UISlider) {
         effectParameters.fallSpeed = slider.value
-        speedValueLabel.text = String(format: "%.2f", slider.value)
+        speedValueLabel?.text = String(format: "%.2f", slider.value)
     }
 
     @objc private func glowChanged(_ slider: UISlider) {
         effectParameters.glowIntensity = slider.value
-        glowValueLabel.text = String(format: "%.2f", slider.value)
+        glowValueLabel?.text = String(format: "%.2f", slider.value)
     }
 
     @objc private func scaleChanged(_ slider: UISlider) {
         effectParameters.characterScale = slider.value
-        scaleValueLabel.text = String(format: "%.2f", slider.value)
+        scaleValueLabel?.text = String(format: "%.2f", slider.value)
     }
 
     @objc private func trailChanged(_ slider: UISlider) {
         effectParameters.trailLength = slider.value
-        trailValueLabel.text = String(format: "%.2f", slider.value)
+        trailValueLabel?.text = String(format: "%.2f", slider.value)
     }
 
     @objc private func colorPresetTapped(_ sender: UIButton) {

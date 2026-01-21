@@ -17,13 +17,21 @@ final class MaterialFactory {
     private let effectParameters: EffectParameters
 
     private var glyphTextureResource: TextureResource?
+    private var animatedTextureResource: TextureResource?
     private var cancellables = Set<AnyCancellable>()
 
-    // Cache materials by surface type
-    private var materialCache: [SurfaceClassifier.SurfaceType: Material] = [:]
+    // Material cache
+    private var materialCache: [SurfaceClassifier.SurfaceType: UnlitMaterial] = [:]
 
     // Current time for shader animation
     private var currentTime: Float = 0.0
+
+    // Matrix animator for procedural animation
+    private var matrixAnimator: MatrixAnimator?
+
+    // Frame counter for texture updates (don't update every frame to save performance)
+    private var frameCounter: Int = 0
+    private let textureUpdateInterval: Int = 4 // Update texture every N frames (reduced for performance)
 
     // MARK: - Initialization
 
@@ -33,6 +41,7 @@ final class MaterialFactory {
         self.effectParameters = effectParameters
 
         setupTextureResource()
+        setupAnimator()
         observeParameterChanges()
     }
 
@@ -90,9 +99,18 @@ final class MaterialFactory {
         }
     }
 
+    private func setupAnimator() {
+        matrixAnimator = MatrixAnimator(
+            device: device,
+            glyphAtlas: textureManager.glyphAtlas,
+            atlasConfig: textureManager.atlasConfig
+        )
+        print("MaterialFactory: Matrix animator initialized")
+    }
+
     private func observeParameterChanges() {
         effectParameters.objectWillChange
-            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.invalidateCache()
             }
@@ -108,47 +126,93 @@ final class MaterialFactory {
             return cached
         }
 
-        // Create fallback material with Matrix-style appearance
-        let material = createMatrixMaterial(for: surfaceType)
+        let material = createAnimatedMaterial(for: surfaceType)
         materialCache[surfaceType] = material
         return material
     }
 
-    /// Creates a Matrix-style material using UnlitMaterial
-    private func createMatrixMaterial(for surfaceType: SurfaceClassifier.SurfaceType) -> Material {
+    /// Creates an animated Matrix material
+    private func createAnimatedMaterial(for surfaceType: SurfaceClassifier.SurfaceType) -> UnlitMaterial {
         let baseColor = effectParameters.baseColor
 
-        // Create color with transparency
+        // Create base color
         let color = UIColor(
             red: CGFloat(baseColor.x),
             green: CGFloat(baseColor.y),
             blue: CGFloat(baseColor.z),
-            alpha: 0.4
+            alpha: 0.8
         )
 
         var material = UnlitMaterial(color: color)
 
-        // Add glyph texture if available
-        if let textureResource = glyphTextureResource {
+        // Use animated texture if available, otherwise use static glyph atlas
+        if let textureResource = animatedTextureResource ?? glyphTextureResource {
             material.color = UnlitMaterial.BaseColor(
-                tint: color,
+                tint: .white.withAlphaComponent(0.9),
                 texture: MaterialParameters.Texture(textureResource)
             )
         }
 
-        // Configure blending
-        material.blending = .transparent(opacity: PhysicallyBasedMaterial.Opacity(floatLiteral: 0.5))
+        // Configure blending for transparency
+        material.blending = .transparent(opacity: .init(floatLiteral: 0.85))
 
         return material
     }
 
-    // MARK: - Material Updates
+    // MARK: - Animation Updates
 
-    /// Updates the time uniform for animation
+    /// Updates the animation and generates new texture - call every frame
     func updateTime(_ time: Float) {
+        let deltaTime = time - currentTime
         currentTime = time
-        // For static materials, we don't need per-frame updates
-        // The animated version would require CustomMaterial with working Metal Toolchain
+
+        // Update animator
+        matrixAnimator?.update(deltaTime: deltaTime)
+
+        // Update texture periodically (not every frame for performance)
+        frameCounter += 1
+        if frameCounter >= textureUpdateInterval {
+            frameCounter = 0
+            updateAnimatedTexture()
+        }
+    }
+
+    /// Generates a new animated texture frame
+    private func updateAnimatedTexture() {
+        guard let animator = matrixAnimator else { return }
+
+        // Generate new frame
+        guard let cgImage = animator.generateTexture(
+            baseColor: effectParameters.baseColor,
+            highlightColor: effectParameters.highlightColor
+        ) else {
+            return
+        }
+
+        // Create texture resource from the generated image
+        do {
+            animatedTextureResource = try TextureResource.generate(
+                from: cgImage,
+                options: TextureResource.CreateOptions(semantic: .raw)
+            )
+
+            // Update all cached materials with new texture
+            for (surfaceType, _) in materialCache {
+                let material = createAnimatedMaterial(for: surfaceType)
+                materialCache[surfaceType] = material
+            }
+        } catch {
+            // Silently fail - will use previous frame or static texture
+        }
+    }
+
+    /// Returns updated materials for all surface types
+    func getUpdatedMaterials() -> [SurfaceClassifier.SurfaceType: Material] {
+        var materials: [SurfaceClassifier.SurfaceType: Material] = [:]
+        for (surfaceType, material) in materialCache {
+            materials[surfaceType] = material
+        }
+        return materials
     }
 
     /// Invalidates the material cache, forcing recreation
@@ -158,6 +222,11 @@ final class MaterialFactory {
 
     /// Returns whether the factory is ready to create materials
     var isReady: Bool {
-        glyphTextureResource != nil
+        glyphTextureResource != nil || animatedTextureResource != nil
+    }
+
+    /// Returns whether animated materials are being used
+    var isUsingCustomMaterials: Bool {
+        matrixAnimator != nil
     }
 }

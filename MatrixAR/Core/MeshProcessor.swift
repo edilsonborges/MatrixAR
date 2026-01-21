@@ -203,6 +203,20 @@ final class MeshProcessor {
         }
     }
 
+    /// Updates materials with new time parameter for animation (call every frame)
+    func updateMaterialsForAnimation() {
+        // Get updated materials from factory
+        let updatedMaterials = materialFactory.getUpdatedMaterials()
+
+        // Apply to all entities
+        for (identifier, entity) in meshEntities {
+            if let surfaceType = meshSurfaceTypes[identifier],
+               let material = updatedMaterials[surfaceType] {
+                entity.model?.materials = [material]
+            }
+        }
+    }
+
     /// Returns statistics about processed meshes
     var statistics: MeshStatistics {
         var wallCount = 0

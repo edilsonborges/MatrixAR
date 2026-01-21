@@ -10,7 +10,7 @@ final class EffectParameters: ObservableObject {
     // MARK: - Published Properties
 
     /// Characters per world unit (affects density of the rain)
-    @Published var characterDensity: Float = 2.0 {
+    @Published var characterDensity: Float = 4.0 {
         didSet { characterDensity = characterDensity.clamped(to: 0.5...5.0) }
     }
 
@@ -63,7 +63,7 @@ final class EffectParameters: ObservableObject {
 
     /// Resets all parameters to defaults
     func reset() {
-        characterDensity = 2.0
+        characterDensity = 4.0
         fallSpeed = 1.0
         glowIntensity = 0.8
         baseColor = simd_float3(0.0, 1.0, 0.3)

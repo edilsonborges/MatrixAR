@@ -294,7 +294,12 @@ final class MatrixARViewController: UIViewController {
     // MARK: - Actions
 
     @objc private func showControlPanel() {
-        let controlPanel = ControlPanelViewController(effectParameters: effectParameters)
+        guard let params = effectParameters else {
+            print("Error: effectParameters not initialized")
+            return
+        }
+
+        let controlPanel = ControlPanelViewController(effectParameters: params)
         controlPanel.modalPresentationStyle = .pageSheet
 
         if let sheet = controlPanel.sheetPresentationController {
